@@ -1,0 +1,875 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Слияние фруктов</title>
+<link rel="icon" href="icon/10.png" type="image/png">
+<script src="https://yandex.ru/games/sdk/v2"></script>
+<style>
+  :root{
+    --jar-w: 380px;
+    --bg-deep:#1b1130;
+    --bg-mid:#2c1a45;
+    --panel:#2a1c40;
+    --panel-line: rgba(255,214,140,0.18);
+    --cream:#fff3e2;
+    --gold:#ffcf5c;
+    --danger:#ff5c6c;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html,body{
+    margin:0; padding:0; height:100%;
+    background:
+      radial-gradient(120% 90% at 50% -10%, #402458 0%, var(--bg-deep) 55%, #120a1f 100%);
+    font-family:'Trebuchet MS','Segoe UI',Verdana,sans-serif;
+    color:var(--cream);
+    overflow:hidden;
+    overscroll-behavior:none;
+    touch-action:none;
+    user-select:none;
+  }
+  #app{
+    display:flex; flex-direction:column; align-items:center;
+    min-height:100%; padding:14px 12px 18px;
+  }
+  header{
+    width:100%; max-width:var(--jar-w);
+    display:flex; align-items:center; justify-content:space-between;
+    margin-bottom:10px;
+  }
+  .brand{display:flex; flex-direction:column; line-height:1.05;}
+  .brand b{
+    font-size:20px; letter-spacing:.3px; color:var(--gold); text-shadow:0 2px 0 rgba(0,0,0,.35);
+    display:flex; align-items:center; gap:6px;
+  }
+  .brand b img{
+    width:24px; height:24px; object-fit:contain;
+    filter:drop-shadow(0 0 6px rgba(255,215,0,0.3));
+  }
+  .brand span{font-size:11px; color:rgba(255,243,226,.6);}
+  .scores{display:flex; gap:8px;}
+  .score-chip{
+    background:var(--panel); border:1px solid var(--panel-line);
+    border-radius:12px; padding:6px 10px; text-align:center; min-width:58px;
+  }
+  .score-chip .l{font-size:9px; color:rgba(255,243,226,.55); display:block;}
+  .score-chip .v{font-size:16px; font-weight:700; color:var(--cream);}
+
+  .stage-wrap{position:relative; width:100%; max-width:var(--jar-w);}
+  canvas{
+    display:block; width:100%; height:auto;
+    border-radius:22px;
+    background:linear-gradient(180deg, rgba(255,255,255,.04), rgba(255,255,255,0) 30%);
+    box-shadow: inset 0 0 0 2px rgba(255,214,140,.25), 0 18px 40px rgba(0,0,0,.45);
+    touch-action:none;
+  }
+
+  .next-row{
+    width:100%; max-width:var(--jar-w);
+    display:flex; align-items:center; justify-content:space-between;
+    margin-top:12px;
+    background:rgba(42,28,64,0.6);
+    padding:8px 14px;
+    border-radius:16px;
+    border:1px solid rgba(255,214,140,0.15);
+    backdrop-filter:blur(4px);
+  }
+  .next-fruit{display:flex; align-items:center; gap:10px;}
+  .next-fruit .label{
+    font-size:13px; color:rgba(255,243,226,.7);
+    font-weight:600; letter-spacing:0.3px;
+  }
+  .next-swatch{
+    width:40px; height:40px; border-radius:50%;
+    display:flex; align-items:center; justify-content:center;
+    background:rgba(255,255,255,0.08);
+    border:2px solid rgba(255,214,140,0.3);
+    overflow:hidden;
+    box-shadow:0 0 20px rgba(255,214,140,0.1);
+  }
+  .next-swatch img{
+    width:80%; height:80%; object-fit:contain;
+  }
+  .icon-btn{
+    width:36px; height:36px; border-radius:10px; border:1px solid var(--panel-line);
+    background:var(--panel); color:var(--cream); font-size:16px;
+    display:flex; align-items:center; justify-content:center; cursor:pointer;
+    transition:transform 0.1s;
+  }
+  .icon-btn:active{transform:scale(.92);}
+  .btn-row{display:flex; gap:8px;}
+
+  .overlay{
+    position:absolute; inset:0; border-radius:22px;
+    background:rgba(18,10,26,.88);
+    display:none; flex-direction:column; align-items:center; justify-content:center;
+    text-align:center; padding:20px; backdrop-filter:blur(2px);
+    z-index:5;
+  }
+  .overlay.show{display:flex;}
+  .overlay h2{margin:0 0 6px; font-size:24px; color:var(--gold);}
+  .overlay p{margin:3px 0; color:rgba(255,243,226,.8); font-size:13px;}
+  .overlay .big{font-size:30px; font-weight:800; color:var(--cream); margin:8px 0;}
+  .overlay button{
+    margin-top:12px; padding:10px 22px; border-radius:999px; border:none;
+    background:linear-gradient(180deg,#ffd873,#ffb23c); color:#3a2100; font-weight:800;
+    font-size:14px; cursor:pointer; box-shadow:0 6px 14px rgba(255,178,60,.35);
+  }
+  .overlay button.ghost{
+    background:transparent; color:var(--cream);
+    border:1px solid var(--panel-line); box-shadow:none;
+  }
+  .overlay button:active{transform:scale(.97);}
+  .combo-toast{
+    position:absolute; left:50%; top:18%; transform:translate(-50%,0);
+    background:rgba(255,214,140,.95); color:#3a2100; font-weight:800;
+    padding:5px 14px; border-radius:999px; font-size:13px; opacity:0;
+    pointer-events:none; transition:opacity .15s, transform .25s;
+    z-index:6;
+  }
+  .combo-toast.show{opacity:1; transform:translate(-50%,-10px);}
+
+  .info-overlay{
+    position:absolute; inset:0; border-radius:22px;
+    background:rgba(18,10,26,.92);
+    display:none; flex-direction:column;
+    padding:20px; overflow-y:auto; z-index:7;
+    backdrop-filter:blur(4px);
+  }
+  .info-overlay.show{display:flex;}
+  .info-overlay h2{text-align:center; color:var(--gold); margin:6px 0;}
+  .info-overlay .close-info{
+    position:absolute; top:12px; right:16px;
+    background:none; border:none; color:var(--cream);
+    font-size:24px; cursor:pointer;
+  }
+  .info-grid{
+    display:grid; grid-template-columns:repeat(5,1fr);
+    gap:6px; margin:10px 0;
+  }
+  .info-item{
+    background:rgba(255,255,255,0.05);
+    border-radius:8px; padding:4px;
+    display:flex; flex-direction:column; align-items:center;
+    border:1px solid rgba(255,214,140,0.1);
+  }
+  .info-item img{width:28px; height:28px; object-fit:contain;}
+  .info-item .iname{font-size:8px; color:rgba(255,243,226,.6); margin-top:2px;}
+  .info-arrow{text-align:center; font-size:18px; color:var(--gold); margin:2px 0;}
+  .info-text{font-size:12px; color:rgba(255,243,226,.7); text-align:center; margin:4px 0;}
+  .fruit-chain{
+    display:flex; gap:4px; justify-content:center; align-items:center;
+    margin:8px 0; flex-wrap:wrap;
+  }
+  .fruit-chain img{
+    width:28px; height:28px; object-fit:contain;
+    filter:drop-shadow(0 0 4px rgba(255,215,0,0.2));
+  }
+  .fruit-chain .arrow{
+    color:var(--gold); font-size:16px; font-weight:bold;
+  }
+
+  footer{margin-top:12px; font-size:10.5px; color:rgba(255,243,226,.45); text-align:center; max-width:var(--jar-w);}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <header>
+    <div class="brand">
+      <b><img src="icon/10.png" alt="арбуз"> Слияние фруктов</b>
+      <span>Соединяй одинаковые — получай следующий</span>
+    </div>
+    <div class="scores">
+      <div class="score-chip"><span class="l">СЧЁТ</span><span class="v" id="scoreVal">0</span></div>
+      <div class="score-chip"><span class="l">РЕКОРД</span><span class="v" id="bestVal">0</span></div>
+    </div>
+  </header>
+
+  <div class="stage-wrap" id="stageWrap">
+    <canvas id="game"></canvas>
+    <div class="combo-toast" id="comboToast">Комбо ×2!</div>
+
+    <div class="overlay show" id="startOverlay">
+      <h2>Слияние фруктов</h2>
+      <p>🖱️ На ПК: води мышью и кликай, чтобы бросить.</p>
+      <p>📱 На телефоне: нажми, веди палец для прицела и отпусти — фрукт упадёт.</p>
+      <p>Два одинаковых фрукта = один крупнее</p>
+      <div class="fruit-chain" id="fruitChain"></div>
+      <p>Собери арбуз, чтобы победить. Не дай фруктам пересечь линию!</p>
+      <button id="startBtn">Играть</button>
+    </div>
+
+    <div class="overlay" id="winOverlay">
+      <h2>🏆 Победа!</h2>
+      <p>Ты собрал арбуз — самый большой фрукт!</p>
+      <div class="big" id="winScore">0</div>
+      <button id="continueBtn">Продолжить</button>
+      <button class="ghost" id="winRestartBtn">Новая игра</button>
+    </div>
+
+    <div class="overlay" id="overOverlay">
+      <h2>Банка переполнена!</h2>
+      <div class="big" id="finalScore">0</div>
+      <p id="newBestNote">Новый рекорд!</p>
+      <button id="retryBtn">Ещё раз</button>
+    </div>
+
+    <div class="info-overlay" id="infoOverlay">
+      <button class="close-info" id="closeInfoBtn">✕</button>
+      <h2>📖 Как играть</h2>
+      <div class="info-text">Соединяй два одинаковых фрукта, чтобы получить следующий. Цель — собрать арбуз!</div>
+      <div class="info-grid" id="infoGrid"></div>
+      <div class="info-text">⬆️ С каждым слиянием фрукты становятся крупнее. Собери арбуз и победи!</div>
+      <div class="info-text" style="margin-top:6px;font-size:11px;color:rgba(255,243,226,.5);">Управление: мышь/палец — прицел, клик/отпуск — бросок</div>
+    </div>
+  </div>
+
+  <div class="next-row">
+    <div class="next-fruit">
+      <span class="label">⬇️ Следующий</span>
+      <div class="next-swatch" id="nextSwatch">🍒</div>
+    </div>
+    <div class="btn-row">
+      <div class="icon-btn" id="infoBtn">ℹ️</div>
+      <div class="icon-btn" id="muteBtn">🔊</div>
+      <div class="icon-btn" id="restartBtn">↻</div>
+    </div>
+  </div>
+
+  <footer>Работает на Яндекс Играх · прогресс сохраняется автоматически</footer>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  /* ======================= YSDK ======================= */
+  let ysdk = null;
+  let ysdkPlayer = null;
+  let memoryBest = 0;
+  const YSDK = {
+    async init(){
+      try{
+        if (typeof YaGames !== 'undefined'){
+          ysdk = await YaGames.init();
+          ysdk.features?.LoadingAPI?.ready?.();
+          try { ysdkPlayer = await ysdk.getPlayer({ scopes:false }); } catch(e){}
+        }
+      }catch(e){ ysdk = null; }
+    },
+    async loadBest(){
+      if (ysdkPlayer){
+        try{
+          const data = await ysdkPlayer.getData(['best']);
+          if (data && data.best) return data.best;
+        }catch(e){}
+      }
+      return Number(memoryBest) || 0;
+    },
+    async saveBest(v){
+      if (ysdkPlayer){
+        try{ await ysdkPlayer.setData({ best: v }, true); }catch(e){}
+      }
+      memoryBest = v;
+    },
+    interstitial(cb){
+      if (ysdk && ysdk.adv && ysdk.adv.showFullscreenAdv){
+        ysdk.adv.showFullscreenAdv({ callbacks:{ onClose:()=>cb&&cb(), onError:()=>cb&&cb() } });
+      } else { cb && cb(); }
+    }
+  };
+
+  /* ============================== Аудио ============================== */
+  let audioCtx = null, muted = false;
+  function beep(freq, dur, type, gain){
+    if (muted) return;
+    try{
+      audioCtx = audioCtx || new (window.AudioContext||window.webkitAudioContext)();
+      const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+      o.type = type||'sine'; o.frequency.value = freq;
+      g.gain.value = gain||0.06;
+      o.connect(g); g.connect(audioCtx.destination);
+      o.start();
+      g.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + (dur||0.15));
+      o.stop(audioCtx.currentTime + (dur||0.15) + 0.02);
+    }catch(e){}
+  }
+  const sfx = {
+    drop: ()=>beep(180,0.12,'triangle',0.04),
+    merge: (tier)=>beep(240+tier*30,0.22,'sine',0.06),
+    win: ()=>{ beep(523,0.12,'sine',0.07); setTimeout(()=>beep(659,0.12,'sine',0.07),110); setTimeout(()=>beep(784,0.2,'sine',0.07),220); },
+    over: ()=>beep(120,0.4,'sawtooth',0.06)
+  };
+
+  /* ================================ TIERS ================================ */
+  const TIERS = [
+    {name:'Вишня',    emoji:'🍒', r:18, color:'#E0384C', hi:'#FF8A93', bg:'rgba(224,56,76,0.25)', icon:'1.png'},
+    {name:'Клубника', emoji:'🍓', r:20, color:'#FF5C77', hi:'#FFB0BE', bg:'rgba(255,92,119,0.25)', icon:'2.png'},
+    {name:'Киви',     emoji:'🥝', r:25, color:'#8BC34A', hi:'#C9E3A6', bg:'rgba(139,195,74,0.25)', icon:'3.png'},
+    {name:'Персик',   emoji:'🍑', r:28, color:'#FFB37A', hi:'#FFD9B8', bg:'rgba(255,179,122,0.25)', icon:'4.png'},
+    {name:'Апельсин', emoji:'🍊', r:32, color:'#FF9F40', hi:'#FFCB8C', bg:'rgba(255,159,64,0.25)', icon:'5.png'},
+    {name:'Яблоко',   emoji:'🍏', r:36, color:'#7CB342', hi:'#C2E39A', bg:'rgba(124,179,66,0.25)', icon:'6.png'},
+    {name:'Груша',    emoji:'🍐', r:40, color:'#C0CA33', hi:'#E3E89A', bg:'rgba(192,202,51,0.25)', icon:'7.png'},
+    {name:'Манго',    emoji:'🥭', r:44, color:'#FFA726', hi:'#FFD699', bg:'rgba(255,167,38,0.25)', icon:'8.png'},
+    {name:'Ананас',   emoji:'🍍', r:48, color:'#FFD23F', hi:'#FFF0AC', bg:'rgba(255,210,63,0.25)', icon:'9.png'},
+    {name:'Арбуз',    emoji:'🍉', r:52, color:'#2E8B45', hi:'#7FD98F', bg:'rgba(46,139,69,0.25)', icon:'10.png'}
+  ];
+  const SPAWN_MAX_TIER = 4;
+  const tierPoints = t => (t+1)*(t+2)*5;
+
+  /* ================================ Canvas ================================ */
+  const canvas = document.getElementById('game');
+  const ctx = canvas.getContext('2d');
+  let W = 380, H = 560, DPR = 1;
+  let jar = { x:14, y:70, w:W-28, h:H-90, lineY:0 };
+  let fruitImages = [];
+
+  function loadImages(){
+    for (let i = 0; i < TIERS.length; i++) {
+      const img = new Image();
+      img.src = 'icon/' + TIERS[i].icon;
+      fruitImages.push(img);
+    }
+  }
+  loadImages();
+
+  function layout(){
+    const wrapW = document.getElementById('stageWrap').clientWidth;
+    W = Math.round(wrapW);
+    H = Math.round(W * 1.5);
+    DPR = Math.min(window.devicePixelRatio||1, 2);
+    canvas.width = W*DPR; canvas.height = H*DPR;
+    canvas.style.width = W+'px'; canvas.style.height = H+'px';
+    ctx.setTransform(DPR,0,0,DPR,0,0);
+    jar.x = 22;
+    jar.y = Math.round(H*0.10);
+    jar.w = W - 44;
+    jar.h = H - jar.y - 14;
+    jar.lineY = jar.y + 42;
+  }
+
+  /* ================================ Состояние ================================ */
+  let balls = [];
+  let particles = [];
+  let sparkles = [];
+  let score = 0, best = 0;
+  let queue = [];
+  let aim = { x: 0, tier: 0 };
+  let aiming = false;
+  let dropCooldown = 0;
+  let overTimer = 0;
+  let running = false;
+  let paused = false;
+  let wonThisRound = false;
+  let comboCount = 0, comboWindow = 0;
+  let lastTime = 0;
+  let winBlinkPhase = -1;
+
+  function randTier(){ return Math.floor(Math.random()*(SPAWN_MAX_TIER+1)); }
+  function refillQueue(){ while(queue.length < 2) queue.push(randTier()); }
+
+  function resetGame(){
+    balls = []; particles = []; sparkles = [];
+    score = 0; overTimer = 0; comboCount = 0; comboWindow = 0;
+    wonThisRound = false; dropCooldown = 0; aiming = false;
+    winBlinkPhase = -1;
+    queue = []; refillQueue();
+    aim.tier = queue.shift(); refillQueue();
+    aim.x = jar.x + jar.w/2;
+    updateHUD();
+  }
+
+  function updateHUD(){
+    document.getElementById('scoreVal').textContent = Math.floor(score);
+    document.getElementById('bestVal').textContent = Math.floor(Math.max(best,score));
+    const t = TIERS[queue[0]];
+    const swatch = document.getElementById('nextSwatch');
+    const img = fruitImages[queue[0]];
+    if (img && img.complete && img.naturalWidth > 0) {
+      swatch.innerHTML = `<img src="${img.src}" alt="${t.name}">`;
+    } else {
+      swatch.textContent = t.emoji;
+    }
+    swatch.style.background = t.bg || 'rgba(255,255,255,0.08)';
+    swatch.style.borderColor = t.color || 'rgba(255,214,140,0.3)';
+  }
+
+  /* ================================ Ввод ================================ */
+  function clientToLocal(clientX){
+    const rect = canvas.getBoundingClientRect();
+    return clientX - rect.left;
+  }
+  function setAimX(x){
+    const r = TIERS[aim.tier].r;
+    aim.x = Math.max(jar.x+r, Math.min(jar.x+jar.w-r, x));
+  }
+  function posFromEvent(e){
+    return clientToLocal(e.clientX);
+  }
+
+  canvas.addEventListener('pointerdown', (e)=>{
+    if (!running) return;
+    aiming = true;
+    try{ canvas.setPointerCapture(e.pointerId); } catch(err){}
+    setAimX(posFromEvent(e));
+    e.preventDefault();
+  });
+  canvas.addEventListener('pointermove', (e)=>{
+    if (!running) return;
+    setAimX(posFromEvent(e));
+    e.preventDefault();
+  });
+  function endAim(e){
+    if (!aiming) return;
+    aiming = false;
+    if (!running) return;
+    setAimX(posFromEvent(e));
+    tryDrop();
+  }
+  canvas.addEventListener('pointerup', endAim);
+  canvas.addEventListener('pointercancel', ()=>{ aiming = false; });
+  canvas.addEventListener('contextmenu', e=>e.preventDefault());
+
+  document.addEventListener('keydown', (e)=>{
+    if (!running) return;
+    if (e.code==='ArrowLeft') setAimX(aim.x-16);
+    if (e.code==='ArrowRight') setAimX(aim.x+16);
+    if (e.code==='Space'){ tryDrop(); e.preventDefault(); }
+  });
+
+  function tryDrop(){
+    if (!running || dropCooldown > 0) return;
+    const t = TIERS[aim.tier];
+    balls.push({
+      x: aim.x, y: jar.y + t.r + 4, vx:0, vy:0,
+      r: t.r, tier: aim.tier, age:0, pop:0
+    });
+    for (let i=0; i<12; i++) {
+      spawnSparks(aim.x + (Math.random()-0.5)*20, jar.y + t.r + 4 + (Math.random()-0.5)*10, t.hi);
+    }
+    sfx.drop();
+    dropCooldown = 30;
+    aim.tier = queue.shift();
+    refillQueue();
+    updateHUD();
+  }
+
+  /* ================================ Физика ================================ */
+  const GRAVITY = 0.028;
+  const DAMP = 0.99;
+  const MAX_VY = 2.4;
+
+  function physicsStep(){
+    for (const b of balls){
+      b.age++;
+      b.vy += GRAVITY;
+      if (b.vy > MAX_VY) b.vy = MAX_VY;
+      b.x += b.vx; b.y += b.vy;
+      b.vx *= DAMP;
+      if (b.x - b.r < jar.x){ b.x = jar.x + b.r; b.vx *= -0.3; }
+      if (b.x + b.r > jar.x + jar.w){ b.x = jar.x + jar.w - b.r; b.vx *= -0.3; }
+      if (b.y + b.r > jar.y + jar.h){
+        b.y = jar.y + jar.h - b.r;
+        b.vy *= -0.2;
+        if (Math.abs(b.vy) < 0.5) b.vy = 0;
+      }
+    }
+
+    const toMerge = [];
+    const merged = new Set();
+    for (let i=0;i<balls.length;i++){
+      for (let j=i+1;j<balls.length;j++){
+        const a=balls[i], b=balls[j];
+        if (merged.has(a)||merged.has(b)) continue;
+        const dx=b.x-a.x, dy=b.y-a.y;
+        const dist=Math.hypot(dx,dy)||0.001;
+        const minDist=a.r+b.r;
+        if (dist < minDist){
+          if (a.tier===b.tier){
+            toMerge.push([a,b]); merged.add(a); merged.add(b); continue;
+          }
+          const overlap = (minDist - dist)/2;
+          const nx=dx/dist, ny=dy/dist;
+          a.x -= nx*overlap; a.y -= ny*overlap;
+          b.x += nx*overlap; b.y += ny*overlap;
+          const rvx=b.vx-a.vx, rvy=b.vy-a.vy;
+          const rel = rvx*nx+rvy*ny;
+          if (rel < 0){
+            const rest=0.04, imp = -(1+rest)*rel/2;
+            a.vx -= imp*nx; a.vy -= imp*ny;
+            b.vx += imp*nx; b.vy += imp*ny;
+          }
+        }
+      }
+    }
+
+    for (const [a,b] of toMerge){
+      const mx=(a.x+b.x)/2, my=(a.y+b.y)/2;
+      spawnPop(mx,my,TIERS[a.tier].color);
+      for (let i=0; i<40; i++) {
+        spawnSparks(mx + (Math.random()-0.5)*50, my + (Math.random()-0.5)*50, TIERS[a.tier].hi);
+      }
+      const mult = Math.max(1, comboCount);
+      if (a.tier === TIERS.length-1){
+        addScore(1500*mult, mx, my-30);
+        if (!wonThisRound) {
+          wonThisRound = true;
+          winBlinkPhase = 0;
+          setTimeout(() => { if (winBlinkPhase >= 0) onWin(); }, 4000);
+        }
+      } else {
+        const nt = a.tier+1;
+        balls.push({x:mx,y:my,vx:0,vy:-0.8,r:TIERS[nt].r,tier:nt,age:0,pop:12});
+        addScore(tierPoints(nt)*mult, mx, my-20);
+        if (nt === TIERS.length-1 && !wonThisRound){
+          wonThisRound = true;
+          winBlinkPhase = 0;
+          setTimeout(() => { if (winBlinkPhase >= 0) onWin(); }, 4000);
+        }
+      }
+      sfx.merge(a.tier);
+      registerCombo();
+    }
+    if (toMerge.length){
+      balls = balls.filter(b => !merged.has(b));
+    }
+
+    for (const b of balls){ if (b.pop>0) b.pop -= 0.4; }
+
+    for (const p of particles){
+      p.x+=p.vx; p.y+=p.vy; p.vy+=0.12; p.life-=1;
+    }
+    particles = particles.filter(p=>p.life>0);
+    for (const s of sparkles){
+      s.x+=s.vx; s.y+=s.vy; s.vy+=0.02; s.life-=1; s.size *= 0.97;
+    }
+    sparkles = sparkles.filter(s=>s.life>0 && s.size>0.2);
+
+    if (dropCooldown>0) dropCooldown--;
+    comboWindow = Math.max(0, comboWindow-1);
+    if (comboWindow===0) comboCount=0;
+
+    checkGameOver();
+  }
+
+  function addScore(v){
+    score += v;
+    updateHUD();
+  }
+  function registerCombo(){
+    comboCount++;
+    comboWindow = 60;
+    if (comboCount>=2){
+      score += 25*comboCount;
+      const el=document.getElementById('comboToast');
+      el.textContent = `Комбо ×${comboCount}!`;
+      el.classList.add('show');
+      clearTimeout(el._t);
+      el._t=setTimeout(()=>el.classList.remove('show'),700);
+      updateHUD();
+    }
+  }
+  function spawnPop(x,y,color){
+    for (let i=0;i<25;i++){
+      const a=Math.random()*Math.PI*2, sp=1+Math.random()*4;
+      particles.push({x,y,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp-1.8,life:30+Math.random()*20,color});
+    }
+  }
+  function spawnSparks(x,y,color){
+    for (let i=0;i<6;i++){
+      const a=Math.random()*Math.PI*2, sp=0.5+Math.random()*2.5;
+      sparkles.push({x,y,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp-0.5,life:18+Math.random()*25,color,size:1.5+Math.random()*4});
+    }
+  }
+
+  /* ============================ Победа и поражение ============================ */
+  async function onWin(){
+    running = false;
+    sfx.win();
+    if (score > best){ best = score; await YSDK.saveBest(best); }
+    document.getElementById('winScore').textContent = Math.floor(score);
+    document.getElementById('winOverlay').classList.add('show');
+    updateHUD();
+  }
+
+  function checkGameOver(){
+    let danger=false;
+    for (const b of balls){
+      const speed = Math.hypot(b.vx, b.vy);
+      if (b.age > 45 && b.y - b.r < jar.lineY && speed < 1.2){ danger=true; break; }
+    }
+    if (danger){ overTimer++; } else { overTimer=Math.max(0, overTimer-2); }
+    if (overTimer > 55){ endGame(); }
+  }
+
+  async function endGame(){
+    running=false;
+    sfx.over();
+    const isNew = score > best;
+    if (isNew){ best = score; await YSDK.saveBest(best); }
+    document.getElementById('finalScore').textContent = Math.floor(score);
+    document.getElementById('newBestNote').style.visibility = isNew ? 'visible':'hidden';
+    document.getElementById('overOverlay').classList.add('show');
+    updateHUD();
+    YSDK.interstitial();
+  }
+
+  /* ================================ Отрисовка ================================ */
+  function drawFruitImage(tier, x, y, r, alpha, pop, blink){
+    const img = fruitImages[tier];
+    const t = TIERS[tier];
+    const scale = 1 + (pop>0 ? pop/50 : 0);
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.scale(scale, scale);
+    
+    ctx.globalAlpha = alpha * 0.3;
+    ctx.beginPath();
+    ctx.arc(0, 0, r, 0, Math.PI*2);
+    ctx.fillStyle = t.bg || 'rgba(255,255,255,0.1)';
+    ctx.fill();
+    ctx.globalAlpha = alpha;
+    
+    ctx.shadowColor = 'rgba(0,0,0,0.3)';
+    ctx.shadowBlur = 12;
+    ctx.shadowOffsetY = 4;
+    
+    let finalAlpha = alpha;
+    if (blink && tier === 9 && winBlinkPhase >= 0) {
+      const isRed = (winBlinkPhase % 2 === 0);
+      ctx.shadowColor = isRed ? 'rgba(255,80,80,0.8)' : 'rgba(255,255,255,0.9)';
+      ctx.shadowBlur = 30;
+      if (isRed) {
+        ctx.globalAlpha = 0.85;
+      } else {
+        ctx.globalAlpha = 0.3;
+        ctx.beginPath();
+        ctx.arc(0,0,r*0.95,0,Math.PI*2);
+        ctx.fillStyle = 'rgba(255,255,255,0.3)';
+        ctx.fill();
+      }
+      ctx.shadowBlur = 0;
+    }
+    ctx.globalAlpha = finalAlpha;
+    
+    if (img && img.complete && img.naturalWidth > 0) {
+      const size = r * 1.7;
+      ctx.drawImage(img, -size/2, -size/2, size, size);
+    } else {
+      const grad = ctx.createRadialGradient(-r*0.3,-r*0.35,r*0.15, 0,0,r);
+      grad.addColorStop(0, t.hi);
+      grad.addColorStop(1, t.color);
+      ctx.globalAlpha = finalAlpha * 0.25;
+      ctx.beginPath();
+      ctx.arc(0,0,r,0,Math.PI*2);
+      ctx.fillStyle = grad;
+      ctx.fill();
+      ctx.globalAlpha = finalAlpha;
+      ctx.font = Math.round(r*1.55) + 'px "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji","Noto Color Emoji Compat",sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(t.emoji, 0, r*0.06);
+    }
+    ctx.restore();
+  }
+
+  function draw(){
+    ctx.clearRect(0,0,W,H);
+
+    ctx.save();
+    ctx.beginPath();
+    const rr=18;
+    ctx.moveTo(jar.x, jar.y);
+    ctx.lineTo(jar.x, jar.y+jar.h-rr);
+    ctx.arcTo(jar.x, jar.y+jar.h, jar.x+rr, jar.y+jar.h, rr);
+    ctx.lineTo(jar.x+jar.w-rr, jar.y+jar.h);
+    ctx.arcTo(jar.x+jar.w, jar.y+jar.h, jar.x+jar.w, jar.y+jar.h-rr, rr);
+    ctx.lineTo(jar.x+jar.w, jar.y);
+    ctx.strokeStyle='rgba(255,214,140,0.55)';
+    ctx.lineWidth=3;
+    ctx.stroke();
+    ctx.restore();
+
+    ctx.save();
+    ctx.setLineDash([6,6]);
+    ctx.strokeStyle = overTimer>15 ? '#ff5c6c' : 'rgba(255,92,108,0.55)';
+    ctx.lineWidth=2;
+    ctx.beginPath();
+    ctx.moveTo(jar.x, jar.lineY);
+    ctx.lineTo(jar.x+jar.w, jar.lineY);
+    ctx.stroke();
+    ctx.restore();
+
+    for (const s of sparkles){
+      ctx.globalAlpha = Math.max(0,s.life/25);
+      ctx.fillStyle = s.color;
+      ctx.shadowBlur = 8;
+      ctx.shadowColor = s.color;
+      ctx.beginPath();
+      ctx.arc(s.x,s.y,Math.max(0.3,s.size),0,Math.PI*2);
+      ctx.fill();
+      ctx.shadowBlur = 0;
+    }
+    ctx.globalAlpha = 1;
+
+    for (const b of balls){
+      let blink = false;
+      if (b.tier === 9 && winBlinkPhase >= 0) blink = true;
+      drawFruitImage(b.tier, b.x, b.y, b.r, 1, b.pop, blink);
+    }
+
+    for (const p of particles){
+      ctx.globalAlpha = Math.max(0,p.life/30);
+      ctx.fillStyle = p.color;
+      ctx.shadowBlur = 6;
+      ctx.shadowColor = p.color;
+      ctx.beginPath(); ctx.arc(p.x,p.y,2+Math.random()*2.5,0,Math.PI*2); ctx.fill();
+      ctx.shadowBlur = 0;
+      ctx.globalAlpha = 1;
+    }
+
+    if (running){
+      const t = TIERS[aim.tier];
+      ctx.save();
+      ctx.setLineDash([4,5]);
+      ctx.strokeStyle='rgba(255,243,226,0.35)';
+      ctx.beginPath();
+      ctx.moveTo(aim.x, jar.y+t.r+8);
+      ctx.lineTo(aim.x, jar.y+jar.h);
+      ctx.stroke();
+      ctx.restore();
+
+      drawFruitImage(aim.tier, aim.x, jar.y + t.r, t.r, dropCooldown>0 ? 0.55 : 1, 0, false);
+    }
+  }
+
+  /* ================================ Инфо-панель ================================ */
+  function buildInfoGrid(){
+    const grid = document.getElementById('infoGrid');
+    grid.innerHTML = '';
+    for (let i = 0; i < TIERS.length; i++) {
+      const div = document.createElement('div');
+      div.className = 'info-item';
+      const img = fruitImages[i];
+      if (img && img.complete && img.naturalWidth > 0) {
+        div.innerHTML = `<img src="${img.src}" alt="${TIERS[i].name}">`;
+      } else {
+        div.innerHTML = `<span style="font-size:20px;">${TIERS[i].emoji}</span>`;
+      }
+      div.innerHTML += `<span class="iname">${TIERS[i].name}</span>`;
+      grid.appendChild(div);
+      if (i < TIERS.length-1) {
+        const arrow = document.createElement('div');
+        arrow.className = 'info-arrow';
+        arrow.textContent = '→';
+        grid.appendChild(arrow);
+      }
+    }
+  }
+
+  function buildFruitChain(){
+    const container = document.getElementById('fruitChain');
+    container.innerHTML = '';
+    for (let i = 0; i < TIERS.length; i++) {
+      const img = document.createElement('img');
+      img.src = 'icon/' + TIERS[i].icon;
+      img.alt = TIERS[i].name;
+      img.title = TIERS[i].name;
+      container.appendChild(img);
+      if (i < TIERS.length-1) {
+        const arrow = document.createElement('span');
+        arrow.className = 'arrow';
+        arrow.textContent = '→';
+        container.appendChild(arrow);
+      }
+    }
+  }
+
+  /* ================================ Игровой цикл ================================ */
+  function loop(ts){
+    if (!lastTime) lastTime = ts;
+    lastTime = ts;
+
+    if (winBlinkPhase >= 0 && winBlinkPhase < 8) {
+      if (!loop._blinkTimer) loop._blinkTimer = 0;
+      loop._blinkTimer += 16;
+      if (loop._blinkTimer > 500) {
+        loop._blinkTimer = 0;
+        winBlinkPhase++;
+        if (winBlinkPhase >= 8) {
+          onWin();
+        }
+      }
+    }
+
+    if (running && !paused){
+      physicsStep();
+      physicsStep();
+    } else {
+      for (const p of particles){ p.x+=p.vx; p.y+=p.vy; p.vy+=0.12; p.life-=1; }
+      particles = particles.filter(p=>p.life>0);
+      for (const s of sparkles){ s.x+=s.vx; s.y+=s.vy; s.vy+=0.02; s.life-=1; s.size*=0.97; }
+      sparkles = sparkles.filter(s=>s.life>0 && s.size>0.2);
+    }
+    draw();
+    requestAnimationFrame(loop);
+  }
+
+  document.addEventListener('visibilitychange', ()=>{
+    if (document.hidden){
+      paused = true;
+      if (score > best){ best = score; YSDK.saveBest(best); }
+    } else {
+      paused = false;
+    }
+  });
+
+  /* ================================ UI-кнопки ================================ */
+  function startRound(){
+    document.getElementById('startOverlay').classList.remove('show');
+    document.getElementById('overOverlay').classList.remove('show');
+    document.getElementById('winOverlay').classList.remove('show');
+    document.getElementById('infoOverlay').classList.remove('show');
+    resetGame(); running = true;
+    winBlinkPhase = -1;
+    loop._blinkTimer = 0;
+  }
+  document.getElementById('startBtn').addEventListener('click', startRound);
+  document.getElementById('retryBtn').addEventListener('click', startRound);
+  document.getElementById('restartBtn').addEventListener('click', startRound);
+  document.getElementById('winRestartBtn').addEventListener('click', startRound);
+  document.getElementById('continueBtn').addEventListener('click', ()=>{
+    document.getElementById('winOverlay').classList.remove('show');
+    running = true;
+  });
+  document.getElementById('muteBtn').addEventListener('click', (e)=>{
+    muted = !muted;
+    e.target.textContent = muted ? '🔇' : '🔊';
+  });
+  document.getElementById('infoBtn').addEventListener('click', ()=>{
+    document.getElementById('infoOverlay').classList.toggle('show');
+  });
+  document.getElementById('closeInfoBtn').addEventListener('click', ()=>{
+    document.getElementById('infoOverlay').classList.remove('show');
+  });
+
+  window.addEventListener('resize', ()=>{ layout(); });
+
+  /* ================================ Старт ================================ */
+  (async function boot(){
+    layout();
+    await YSDK.init();
+    best = await YSDK.loadBest();
+    resetGame();
+    updateHUD();
+    buildInfoGrid();
+    buildFruitChain();
+    requestAnimationFrame(loop);
+  })();
+
+})();
+</script>
+</body>
+</html>
